@@ -1,7 +1,13 @@
-FROM python:alpine3.7
-COPY . /app
+# Simple Python web app using Flask (serves Hello World)
+FROM python:3.11-slim
+ 
 WORKDIR /app
-RUN pip install -r requirements.txt
+ 
+# Minimal app
+RUN pip install --no-cache-dir flask
+COPY app.py /app/app.py
+ 
+ENV FLASK_RUN_PORT=5001
 EXPOSE 5001
-ENTRYPOINT [ "python" ]
-CMD [ "demo.py" ]
+ 
+CMD ["python", "app.py"]
