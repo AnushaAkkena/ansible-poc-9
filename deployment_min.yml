@@ -1,0 +1,108 @@
+---
+- name: Build and run sample Docker app
+  hosts: all
+  become: true
+  gather_facts: true
+ 
+  vars:
+    remote_app_dir: /home/ec2-user/project
+    image_name: myapp
+    image_tag: latest
+    container_name: myapp
+    published_port: "5001:5001"
+ 
+    # Use system Python
+    ansible_python_interpreter: /usr/bin/python3
+ 
+  pre_tasks:
+    - name: Ensure project directory exists
+      ansible.builtin.file:
+        path: "{{ remote_app_dir }}"
+        state: directory
+        owner: ec2-user
+        group: ec2-user
+        mode: "0755"
+ 
+    # Install Docker engine (basic)
+    - name: Install Docker (Amazon/RedHat)
+      package:
+        name: docker
+        state: present
+      when: ansible_os_family in ["Amazon", "RedHat"]
+ 
+    - name: Install Docker (Debian/Ubuntu)
+      apt:
+        name: docker.io
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+ 
+    - name: Ensure docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: true
+ 
+    # Install Docker SDK for Python via OS packages (avoids pip/RPM conflicts)
+    - name: Install Python Docker SDK (Amazon/RedHat)
+      package:
+        name: python3-docker
+        state: present
+      when: ansible_os_family in ["Amazon", "RedHat"]
+ 
+    - name: Install Python Docker SDK (Debian/Ubuntu)
+      apt:
+        name: python3-docker
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+ 
+    # Copy build context (Dockerfile + app.py) from controller to remote
+    - name: Copy Dockerfile
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/Dockerfile"
+        dest: "{{ remote_app_dir }}/Dockerfile"
+        owner: ec2-user
+        group: ec2-user
+        mode: "0644"
+ 
+    - name: Copy app.py
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/app.py"
+        dest: "{{ remote_app_dir }}/app.py"
+        owner: ec2-user
+        group: ec2-user
+        mode: "0644"
+ 
+  tasks:
+    - name: Build Docker image on remote
+      community.docker.docker_image:
+        name: "{{ image_name }}"
+        tag: "{{ image_tag }}"
+        source: build
+        build:
+          path: "{{ remote_app_dir }}"
+          dockerfile: Dockerfile
+        state: present
+ 
+    - name: Ensure container is running
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        image: "{{ image_name }}:{{ image_tag }}"
+        state: started
+        restart_policy: always
+        recreate: true
+        ports:
+          - "{{ published_port }}"
+        detach: true
+ 
+    - name: Wait for app port to be reachable
+      wait_for:
+        host: "127.0.0.1"
+        port: 5001
+        delay: 2
+        timeout: 30
+ 
+    - name: Success message
+      debug:
+        msg: "Sample Docker app is running on port 5001."
