@@ -23,40 +23,14 @@
         group: ec2-user
         mode: "0755"
  
-    # Install Docker engine (basic)
-    - name: Install Docker (Amazon/RedHat)
-      package:
-        name: docker
-        state: present
-      when: ansible_os_family in ["Amazon", "RedHat"]
- 
-    - name: Install Docker (Debian/Ubuntu)
-      apt:
-        name: docker.io
-        state: present
-        update_cache: true
-      when: ansible_os_family == "Debian"
+    
  
     - name: Ensure docker service is running
       service:
         name: docker
         state: started
         enabled: true
- 
-    # Install Docker SDK for Python via OS packages (avoids pip/RPM conflicts)
-    - name: Install Python Docker SDK (Amazon/RedHat)
-      package:
-        name: python3-docker
-        state: present
-      when: ansible_os_family in ["Amazon", "RedHat"]
- 
-    - name: Install Python Docker SDK (Debian/Ubuntu)
-      apt:
-        name: python3-docker
-        state: present
-        update_cache: true
-      when: ansible_os_family == "Debian"
- 
+        
     # Copy build context (Dockerfile + app.py) from controller to remote
     - name: Copy Dockerfile
       ansible.builtin.copy:
